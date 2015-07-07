@@ -1,6 +1,7 @@
 # configlog
 
- Package for simpe config load end enable logfile
+ Package for simpe config load and enable logfile
+ If logfile not found, log output will be printed to STDOUT
 
 ```
 $ go get github.com/andboson/configlog
