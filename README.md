@@ -44,6 +44,12 @@ log file loaded from `logfile` config value
 
 Sample use:
 ```
+import (
+    . "github.com/andboson/configlog"
+)
+
+
+
  debug, error := AppConfig.String("debug")
 ```
 
