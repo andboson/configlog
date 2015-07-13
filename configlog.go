@@ -3,10 +3,9 @@ package configlog
 import (
 	"github.com/olebedev/config"
 	"path/filepath"
-	"os"
+	 "os"
 	"log"
 	"io/ioutil"
-	"runtime"
 	"regexp"
 	"strings"
 )
@@ -32,19 +31,17 @@ func load(){
 func detectProdConfig() string{
 	var levelUp string
 	sep := string(filepath.Separator)
-	curDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	curDir, _ := os.Getwd()
 
 	//detect from test or console
 	match, _ := regexp.MatchString("_test",curDir)
 	matchArgs, _ := regexp.MatchString("arguments",curDir)
-	if(match || matchArgs){
-		matchTestsDir, _ := regexp.MatchString("tests",curDir)
+	matchTestsDir, _ := regexp.MatchString("tests",curDir)
+	if(match || matchArgs || matchTestsDir){
 		if(matchTestsDir){
 			levelUp = ".."
 		}
-		_, file, _, _ := runtime.Caller(1)
-		callerPath, _ := filepath.Abs(filepath.Dir(filepath.Join(file, levelUp + string(filepath.Separator))))
-		curDir = callerPath
+		curDir, _ = filepath.Abs(curDir + string(filepath.Separator) + levelUp + string(filepath.Separator))
 	}
 
 	CurrDirectory = curDir;
