@@ -8,6 +8,13 @@ import (
 	"io/ioutil"
 	"regexp"
 	"strings"
+	"github.com/kardianos/osext"
+)
+
+const (
+	CONFIG_DIR = "config"
+	PRODUCTION_FOLDER = "production"
+	CONFIG_FILE = "app.yml"
 )
 
 var AppConfig *config.Config
@@ -18,20 +25,28 @@ func init(){
 }
 
 func load(){
-	configFile := detectProdConfig()
-	yml, err := ioutil.ReadFile(configFile)
-	AppConfig, err = config.ParseYaml(string(yml))
-	if(err != nil){
+	var err error
+	var yml []byte
+	configFile := detectProdConfig(false)
+	yml, err = ioutil.ReadFile(configFile)
+	if(err != nil ){
 		log.Printf("Unable to find config in path: %s,  %s", configFile, err)
 		return
 	}
+	AppConfig, err = config.ParseYaml(string(yml))
 	EnableLogfile()
 }
 
-func detectProdConfig() string{
+func detectProdConfig(useosxt bool) string{
 	var levelUp string
+	var curDir string
 	sep := string(filepath.Separator)
-	curDir, _ := os.Getwd()
+
+	if(useosxt){
+		curDir, _ = os.Getwd()
+	}else {
+		curDir, _ = osext.ExecutableFolder()
+	}
 
 	//detect from test or console
 	match, _ := regexp.MatchString("_test",curDir)
@@ -41,15 +56,17 @@ func detectProdConfig() string{
 		if(matchTestsDir){
 			levelUp = ".."
 		}
-		curDir, _ = filepath.Abs(curDir + string(filepath.Separator) + levelUp + string(filepath.Separator))
+		curDir, _ = filepath.Abs(curDir + sep+ levelUp + sep)
 	}
 
 	CurrDirectory = curDir;
-	configDir, _ := filepath.Abs(curDir + sep +"config" + sep)
-	appConfig := configDir + sep + "app.yml"
-	appProdConfig := configDir + sep + "production" + sep + "app.yml"
+	configDir, _ := filepath.Abs(curDir + sep + CONFIG_DIR + sep)
+	appConfig := configDir + sep + CONFIG_FILE
+	appProdConfig := configDir + sep + PRODUCTION_FOLDER + sep + CONFIG_FILE
 	if(fileExists(appProdConfig)){
 		appConfig = appProdConfig
+	} else if(!useosxt){
+		appConfig = detectProdConfig(true)
 	}
 
 	return appConfig
