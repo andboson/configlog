@@ -4,11 +4,11 @@ import (
 	"github.com/olebedev/config"
 	"path/filepath"
 	 "os"
-	"log"
 	"io/ioutil"
 	"regexp"
 	"strings"
 	"github.com/kardianos/osext"
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -34,6 +34,7 @@ func load(){
 		return
 	}
 	AppConfig, err = config.ParseYaml(string(yml))
+	log.SetFormatter(&log.JSONFormatter{})
 	EnableLogfile()
 }
 
