@@ -9,6 +9,7 @@ import (
 	"strings"
 	"github.com/kardianos/osext"
 	log "github.com/Sirupsen/logrus"
+	"time"
 )
 
 const (
@@ -20,8 +21,19 @@ const (
 var AppConfig *config.Config
 var CurrDirectory string;
 
+const RELOAD_CONFIGLOG_TIME_SECOND = time.Second * 10 * 2
+
 func init(){
+	ReloadConfigLog()
+}
+
+func ReloadConfigLog() {
+	log.SetOutput(os.Stderr)
+	log.SetFormatter(&log.TextFormatter{})
 	load()
+	go time.AfterFunc(RELOAD_CONFIGLOG_TIME_SECOND, ReloadConfigLog)
+
+	return
 }
 
 func load(){
@@ -34,7 +46,6 @@ func load(){
 		return
 	}
 	AppConfig, err = config.ParseYaml(string(yml))
-	log.SetFormatter(&log.JSONFormatter{})
 	EnableLogfile()
 }
 
@@ -102,6 +113,7 @@ func EnableLogfile(){
 		log.Fatalf("error opening file: %v", err)
 	}
 
+	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(f)
 }
 
