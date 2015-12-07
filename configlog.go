@@ -31,7 +31,8 @@ func ReloadConfigLog() {
 	log.SetOutput(os.Stderr)
 	log.SetFormatter(&log.TextFormatter{})
 	load()
-	go time.AfterFunc(RELOAD_CONFIGLOG_TIME_SECOND, ReloadConfigLog)
+	// disabled due to incontinence state while reload
+	// go time.AfterFunc(RELOAD_CONFIGLOG_TIME_SECOND, ReloadConfigLog)
 
 	return
 }
