@@ -9,7 +9,8 @@ import (
 	"strings"
 	"github.com/kardianos/osext"
 	log "github.com/Sirupsen/logrus"
-	"time"
+	"github.com/howeyc/fsnotify"
+	"sync"
 )
 
 const (
@@ -20,19 +21,40 @@ const (
 
 var AppConfig *config.Config
 var CurrDirectory string;
-
-const RELOAD_CONFIGLOG_TIME_SECOND = time.Second * 10 * 2
+var m sync.RWMutex
 
 func init(){
 	ReloadConfigLog()
+	watchLog()
+}
+
+func watchLog(){
+	logfileName, _ := AppConfig.String("logfile")
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		for {
+			select {
+			case ev := <-watcher.Event:
+				if ev.IsRename() || ev.IsDelete() {
+					ReloadConfigLog()
+				}
+			case err := <-watcher.Error:
+				log.Println("log watcher error:", err)
+			}
+		}
+	}()
+	err = watcher.Watch(logfileName)
 }
 
 func ReloadConfigLog() {
+	m.Lock()
+	defer m.Unlock()
 	log.SetOutput(os.Stderr)
 	log.SetFormatter(&log.TextFormatter{})
 	load()
-	// disabled due to incontinence state while reload
-	// go time.AfterFunc(RELOAD_CONFIGLOG_TIME_SECOND, ReloadConfigLog)
 
 	return
 }

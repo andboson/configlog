@@ -3,6 +3,19 @@
  Package for simpe config load and enable logfile
  If logfile not found, log output will be printed to STDOUT
 
+###chanelog
+
+####16.12.2015
+  
+  For support logrotate added log file watcher. It watch for rename, delete.  
+
+####01.12.2015
+  
+  Disabled reload by time.
+  
+  
+####use:
+
 ```
 $ go get github.com/andboson/configlog
 ```
