@@ -22,6 +22,7 @@ const (
 var AppConfig *config.Config
 var CurrDirectory string;
 var m sync.RWMutex
+var Out *os.File
 
 func init(){
 	ReloadConfigLog()
@@ -29,6 +30,10 @@ func init(){
 }
 
 func watchLog(){
+	if AppConfig == nil {
+		return
+	}
+
 	logfileName, _ := AppConfig.String("logfile")
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -69,7 +74,8 @@ func load(){
 		return
 	}
 	AppConfig, err = config.ParseYaml(string(yml))
-	EnableLogfile()
+	logfileName, _ := AppConfig.String("logfile")
+	EnableLogfile(logfileName)
 }
 
 func detectProdConfig(useosxt bool) string{
@@ -107,12 +113,12 @@ func detectProdConfig(useosxt bool) string{
 	return appConfig
 }
 
-func EnableLogfile(){
-	logfileName, _ := AppConfig.String("logfile")
+func EnableLogfile(logfileName string) *os.File{
+
 
 	if(logfileName == ""){
 		log.Printf("logfile is STDOUT")
-		return;
+		return nil;
 	}
 
 	log.Printf("logfile is %s", logfileName)
@@ -138,6 +144,10 @@ func EnableLogfile(){
 
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(f)
+
+	Out = f
+
+	return f
 }
 
 func fileExists(name string) bool {
