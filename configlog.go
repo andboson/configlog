@@ -71,7 +71,7 @@ func watchLog() {
 		}
 
 	}()
-	err = watcher.Watch(configFile)
+	err = watcher2.Watch(configFile)
 	err = watcher.Watch(logfileName)
 }
 
