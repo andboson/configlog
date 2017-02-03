@@ -1,7 +1,6 @@
 package configlog
 
 import (
-	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/howeyc/fsnotify"
 	"github.com/kardianos/osext"
