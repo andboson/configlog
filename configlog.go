@@ -37,9 +37,11 @@ func watchLog() {
 	}
 	sigs := make(chan os.Signal, 1)
 
+	configFile := detectProdConfig(false)
 	logfileName, _ := AppConfig.String("logfile")
 	watcher, err := fsnotify.NewWatcher()
-	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGTERM)
+	watcher2, err := fsnotify.NewWatcher()
+	signal.Notify(sigs, syscall.SIGUSR1)
 
 	if err != nil {
 		log.Fatal(err)
@@ -47,6 +49,10 @@ func watchLog() {
 	go func() {
 		for {
 			select {
+			case ev := <-watcher2.Event:
+				if ev.IsModify() {
+					ReloadConfigLog()
+				}
 			case ev := <-watcher.Event:
 				if ev.IsRename() || ev.IsDelete() {
 					ReloadConfigLog()
@@ -65,6 +71,7 @@ func watchLog() {
 		}
 
 	}()
+	err = watcher.Watch(configFile)
 	err = watcher.Watch(logfileName)
 }
 
@@ -152,7 +159,7 @@ func EnableLogfile(logfileName string) *os.File {
 	}
 
 	if Out != nil {
-		log.Printf("[configlog] closing file")
+		log.Printf("[configlog] reopening file")
 		Out.Close()
 	}
 	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
