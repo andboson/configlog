@@ -1,41 +1,47 @@
 package configlog
 
 import (
-	"github.com/olebedev/config"
-	"path/filepath"
-	 "os"
-	"io/ioutil"
-	"regexp"
-	"strings"
-	"github.com/kardianos/osext"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/howeyc/fsnotify"
+	"github.com/kardianos/osext"
+	"github.com/olebedev/config"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
+	"syscall"
 )
 
 const (
-	CONFIG_DIR = "config"
+	CONFIG_DIR        = "config"
 	PRODUCTION_FOLDER = "production"
-	CONFIG_FILE = "app.yml"
+	CONFIG_FILE       = "app.yml"
 )
 
 var AppConfig *config.Config
-var CurrDirectory string;
+var CurrDirectory string
 var m sync.RWMutex
 var Out *os.File
 
-func init(){
+func init() {
 	ReloadConfigLog()
 	watchLog()
 }
 
-func watchLog(){
+func watchLog() {
 	if AppConfig == nil {
 		return
 	}
+	sigs := make(chan os.Signal, 1)
 
 	logfileName, _ := AppConfig.String("logfile")
 	watcher, err := fsnotify.NewWatcher()
+	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGTERM)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,9 +53,18 @@ func watchLog(){
 					ReloadConfigLog()
 				}
 			case err := <-watcher.Error:
-				log.Println("log watcher error:", err)
+				log.Println("[configlog]  log watcher error:", err)
 			}
 		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-sigs:
+				ReloadConfigLog()
+			}
+		}
+
 	}()
 	err = watcher.Watch(logfileName)
 }
@@ -60,91 +75,94 @@ func ReloadConfigLog() {
 	log.SetOutput(os.Stderr)
 	log.SetFormatter(&log.TextFormatter{})
 	load()
+	log.Printf("[configlog] reaload config")
 
 	return
 }
 
-func load(){
+func load() {
 	var err error
 	var yml []byte
 	configFile := detectProdConfig(false)
 	yml, err = ioutil.ReadFile(configFile)
-	if(err != nil ){
-		log.Printf("Unable to find config in path: %s,  %s", configFile, err)
+	if err != nil {
+		log.Printf("[configlog]  Unable to find config in path: %s,  %s", configFile, err)
 		return
 	}
 	AppConfig, err = config.ParseYaml(string(yml))
 	logfileName, _ := AppConfig.String("logfile")
-	EnableLogfile(logfileName)
+	Out = EnableLogfile(logfileName)
 }
 
-func detectProdConfig(useosxt bool) string{
+func detectProdConfig(useosxt bool) string {
 	var levelUp string
 	var curDir string
 	sep := string(filepath.Separator)
 
-	if(useosxt){
+	if useosxt {
 		curDir, _ = os.Getwd()
-	}else {
+	} else {
 		curDir, _ = osext.ExecutableFolder()
 	}
 
 	//detect from test or console
-	match, _ := regexp.MatchString("_test",curDir)
-	matchArgs, _ := regexp.MatchString("arguments",curDir)
-	matchTestsDir, _ := regexp.MatchString("tests",curDir)
-	if(match || matchArgs || matchTestsDir){
-		if(matchTestsDir){
+	match, _ := regexp.MatchString("_test", curDir)
+	matchArgs, _ := regexp.MatchString("arguments", curDir)
+	matchTestsDir, _ := regexp.MatchString("tests", curDir)
+	if match || matchArgs || matchTestsDir {
+		if matchTestsDir {
 			levelUp = ".."
 		}
-		curDir, _ = filepath.Abs(curDir + sep+ levelUp + sep)
+		curDir, _ = filepath.Abs(curDir + sep + levelUp + sep)
 	}
 
-	CurrDirectory = curDir;
+	CurrDirectory = curDir
 	configDir, _ := filepath.Abs(curDir + sep + CONFIG_DIR + sep)
 	appConfig := configDir + sep + CONFIG_FILE
 	appProdConfig := configDir + sep + PRODUCTION_FOLDER + sep + CONFIG_FILE
-	if(fileExists(appProdConfig)){
+	if fileExists(appProdConfig) {
 		appConfig = appProdConfig
-	} else if(!useosxt){
+	} else if !useosxt {
 		appConfig = detectProdConfig(true)
 	}
 
 	return appConfig
 }
 
-func EnableLogfile(logfileName string) *os.File{
+func EnableLogfile(logfileName string) *os.File {
 
-
-	if(logfileName == ""){
-		log.Printf("logfile is STDOUT")
-		return nil;
+	if logfileName == "" {
+		log.Printf("[configlog]  logfile is STDOUT")
+		return nil
 	}
 
-	log.Printf("logfile is %s", logfileName)
+	log.Printf("[configlog]  logfile is %s", logfileName)
 	logFile := logfileName
 	logfileNameSlice := strings.Split(logfileName, string(filepath.Separator))
 
 	//relative path
-	if(len(logfileNameSlice) > 1 && logfileNameSlice[0] != ""){
-		logFile = CurrDirectory + string(filepath.Separator)  +logfileName
+	if len(logfileNameSlice) > 1 && logfileNameSlice[0] != "" {
+		logFile = CurrDirectory + string(filepath.Separator) + logfileName
 	}
 
 	//try to create log folder
-	if(len(logfileNameSlice) > 1) {
-		logfileNameSlice =  logfileNameSlice[:len(logfileNameSlice)-1]
+	if len(logfileNameSlice) > 1 {
+		logfileNameSlice = logfileNameSlice[:len(logfileNameSlice)-1]
 		logPath := strings.Join(logfileNameSlice, string(filepath.Separator))
 		os.Mkdir(logPath, 0777)
 	}
 
-	f, err := os.OpenFile(logFile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if Out != nil {
+		log.Printf("[configlog] closing file")
+		Out.Close()
+	}
+	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+		log.Fatalf("[configlog] error opening file: %v", err)
 	}
 
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(f)
-
 	Out = f
 
 	return f
